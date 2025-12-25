@@ -23,7 +23,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          # IMPORTANT: no cache here because you have no lockfile
+          # NOTE: do not enable cache unless you commit a lockfile
 
       - name: Install dependencies
         run: npm install
@@ -31,25 +31,61 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Add SPA fallback
+      - name: Show folders (debug)
         run: |
-          if [ -f dist/index.html ]; then
-            cp dist/index.html dist/404.html
+          echo "---- repo root ----"
+          ls -la
+          echo "---- dist ----"
+          ls -la dist || true
+          echo "---- build ----"
+          ls -la build || true
+          echo "---- docs ----"
+          ls -la docs || true
+          echo "---- dist/* ----"
+          ls -la dist/* 2>/dev/null || true
+
+      - name: Detect publish directory
+        id: detect
+        shell: bash
+        run: |
+          set -e
+
+          # Common output dirs
+          if [ -f "dist/index.html" ]; then
+            echo "dir=dist" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-      - name: Inspect build output
-        run: |
-          ls -la dist || true
-          ls -R dist || true
+          if [ -f "build/index.html" ]; then
+            echo "dir=build" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
 
-      - name: Ensure build output looks correct
+          if [ -f "docs/index.html" ]; then
+            echo "dir=docs" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Vite/Angular sometimes output to dist/<name>/index.html
+          CANDIDATE=$(find dist -maxdepth 2 -type f -name index.html 2>/dev/null | head -n 1 || true)
+          if [ -n "$CANDIDATE" ]; then
+            DIR=$(dirname "$CANDIDATE")
+            echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "❌ Could not find built index.html (dist/, build/, docs/, or dist/*/)."
+          echo "Search results:"
+          find . -maxdepth 3 -type f -name index.html || true
+          exit 1
+
+      - name: Add SPA fallback (optional)
         run: |
-          test -f dist/index.html
-          test -d dist/assets
+          cp "${{ steps.detect.outputs.dir }}/index.html" "${{ steps.detect.outputs.dir }}/404.html"
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          publish_dir: ${{ steps.detect.outputs.dir }}
           force_orphan: true
