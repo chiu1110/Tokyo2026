@@ -1,49 +1,31 @@
-name: Deploy Angular to GitHub Pages
+name: Deploy Vite App to GitHub Pages
 
 on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
 
-permissions:
-  contents: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: true
-
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      # If your Angular project isn't in the repo root, set working-directory in steps.
       - name: Build
-        run: |
-          npx ng build --configuration production --base-href "/${{ github.event.repository.name }}/"
+        run: npm run build
 
-      # Copy index.html to 404.html so Angular routes work on refresh
-      - name: SPA fallback (404.html)
-        run: |
-          DIST_DIR=$(ls -d dist/* | head -n 1)
-          cp "$DIST_DIR/index.html" "$DIST_DIR/404.html"
-
-      - name: Deploy to gh-pages
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dist
-          # publish_dir must be the actual built folder; for Angular it's dist/<project-name>
-          # We'll correct this below.
+          publish_dir: ./dist
