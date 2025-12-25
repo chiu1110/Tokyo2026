@@ -5,7 +5,6 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
-# This is REQUIRED so github-actions[bot] can push to gh-pages
 permissions:
   contents: write
 
@@ -16,7 +15,6 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,31 +23,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          # IMPORTANT: no cache here because you have no lockfile
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      # IMPORTANT for https://chiu1110.github.io/Tokyo2026/
-      # Make sure you also set base: "/Tokyo2026/" in vite.config.ts
       - name: Build
         run: npm run build
 
-      # Optional but helpful: SPA refresh/deep-link support
       - name: Add SPA fallback
         run: |
           if [ -f dist/index.html ]; then
             cp dist/index.html dist/404.html
           fi
 
-      # Debug so you can confirm dist/assets exists in logs
       - name: Inspect build output
         run: |
-          echo "---- dist tree ----"
           ls -la dist || true
           ls -R dist || true
 
-      # Fail fast if build output is not what GitHub Pages needs
       - name: Ensure build output looks correct
         run: |
           test -f dist/index.html
